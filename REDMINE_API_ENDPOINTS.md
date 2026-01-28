@@ -24,37 +24,126 @@ La API REST debe estar habilitada en Redmine:
 - Ir a: **Administración → Configuración → API**
 - Marcar: **Habilitar servicio REST**
 
-### Métodos de Autenticación
+### Flujo de Autenticación para Kanbmine
 
-#### 1. API Key (Recomendado)
-La API Key se encuentra en la cuenta del usuario: `/my/account` (panel derecho)
+#### Proceso de Login con Usuario y Password
 
-**Tres formas de enviar la API Key:**
+Redmine utiliza **HTTP Basic Authentication** para validar credenciales de usuario. El flujo recomendado es:
 
-**a) Como parámetro en URL:**
+1. **Usuario ingresa credenciales** (username y password)
+2. **Validar credenciales** haciendo una petición a `/users/current.json` con HTTP Basic Auth
+3. **Obtener API Key** del usuario autenticado
+4. **Guardar API Key** para todas las peticiones subsecuentes
+
+#### 1. Login Inicial - HTTP Basic Authentication
+
+**Endpoint de Validación:** `GET /users/current.json`
+
+**Headers:**
 ```http
-GET /issues.json?key=YOUR_API_KEY
+Authorization: Basic BASE64(username:password)
 ```
 
-**b) Como header HTTP (preferido):**
+**Ejemplo de Request:**
+```http
+GET /users/current.json HTTP/1.1
+Host: redmine.example.com
+Authorization: Basic am9obi5zbWl0aDpteXBhc3N3b3Jk
+```
+
+**Cálculo del Header Authorization:**
+```
+username = "john.smith"
+password = "mypassword"
+credentials = "john.smith:mypassword"
+base64_credentials = Base64.encode(credentials)  // am9obi5zbWl0aDpteXBhc3N3b3Jk
+header = "Authorization: Basic am9obi5zbWl0aDpteXBhc3N3b3Jk"
+```
+
+**Respuesta Exitosa (200 OK):**
+```json
+{
+  "user": {
+    "id": 3,
+    "login": "john.smith",
+    "firstname": "John",
+    "lastname": "Smith",
+    "mail": "john.smith@example.com",
+    "api_key": "ebc3f6b781a6fb3f2b0a83ce0ebb80e0d585189d",
+    "created_on": "2023-01-15T10:30:00Z",
+    "last_login_on": "2026-01-28T08:15:30Z",
+    "status": 1
+  }
+}
+```
+
+**Respuesta Error (401 Unauthorized):**
+```json
+{
+  "errors": ["Invalid username or password"]
+}
+```
+
+#### 2. Uso del API Key para Peticiones Subsecuentes
+
+Una vez obtenido el **API Key**, úsalo en todas las peticiones posteriores:
+
+**a) Como Header HTTP (Recomendado):**
 ```http
 GET /issues.json
 Headers:
-  X-Redmine-API-Key: YOUR_API_KEY
+  X-Redmine-API-Key: ebc3f6b781a6fb3f2b0a83ce0ebb80e0d585189d
 ```
 
-**c) Como usuario HTTP Basic Auth:**
+**b) Como parámetro en URL:**
+```http
+GET /issues.json?key=ebc3f6b781a6fb3f2b0a83ce0ebb80e0d585189d
+```
+
+**c) Como usuario en HTTP Basic Auth:**
 ```http
 GET /issues.json
 Headers:
-  Authorization: Basic BASE64(api_key:random_password)
+  Authorization: Basic BASE64(api_key:anypassword)
 ```
 
-#### 2. HTTP Basic Authentication
-```http
-GET /issues.json
-Headers:
-  Authorization: Basic BASE64(username:password)
+#### Resumen del Flujo
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  1. Usuario ingresa username y password en formulario       │
+└─────────────────────────┬───────────────────────────────────┘
+                          │
+                          ▼
+┌─────────────────────────────────────────────────────────────┐
+│  2. POST /users/current.json                                │
+│     Authorization: Basic BASE64(username:password)          │
+└─────────────────────────┬───────────────────────────────────┘
+                          │
+                          ▼
+              ┌───────────────────────┐
+              │   ¿Credenciales       │
+              │    válidas?           │
+              └─────┬─────────┬───────┘
+                    │         │
+              SI    │         │  NO
+                    │         │
+                    ▼         ▼
+         ┌──────────────┐   ┌─────────────────┐
+         │ 200 OK       │   │ 401 Unauthorized│
+         │ + user.api_key│   │ Credenciales    │
+         └──────┬───────┘   │ incorrectas     │
+                │           └─────────────────┘
+                ▼
+┌─────────────────────────────────────────────────────────────┐
+│  3. Guardar API Key en LocalStorage/Cookie/Sesión          │
+└─────────────────────────┬───────────────────────────────────┘
+                          │
+                          ▼
+┌─────────────────────────────────────────────────────────────┐
+│  4. Todas las peticiones posteriores usan:                  │
+│     X-Redmine-API-Key: {api_key}                            │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ### Content-Type Requerido
@@ -68,17 +157,26 @@ Content-Type: application/xml    # Para XML
 
 ## Usuarios (Users)
 
-### Obtener Usuario Actual
+### Obtener Usuario Actual (Endpoint de Login)
 **Endpoint:** `GET /users/current.json`
 
-**Descripción:** Retorna la información del usuario autenticado (usando API Key o credenciales).
+**Descripción:** Retorna la información del usuario autenticado. **Este es el endpoint principal para el login con usuario y password.**
 
-**Headers:**
+**Autenticación con Usuario y Password:**
 ```http
-X-Redmine-API-Key: YOUR_API_KEY
+GET /users/current.json HTTP/1.1
+Host: redmine.example.com
+Authorization: Basic BASE64(username:password)
 ```
 
-**Respuesta (200 OK):**
+**Autenticación con API Key (peticiones posteriores):**
+```http
+GET /users/current.json HTTP/1.1
+Host: redmine.example.com
+X-Redmine-API-Key: ebc3f6b781a6fb3f2b0a83ce0ebb80e0d585189d
+```
+
+**Respuesta Exitosa (200 OK):**
 ```json
 {
   "user": {
@@ -89,14 +187,27 @@ X-Redmine-API-Key: YOUR_API_KEY
     "mail": "john@example.com",
     "created_on": "2007-09-28T00:16:04+02:00",
     "updated_on": "2010-08-01T18:05:45+02:00",
-    "last_login_on": "2011-08-01T18:05:45+02:00",
+    "last_login_on": "2026-01-28T08:15:30+02:00",
     "api_key": "ebc3f6b781a6fb3f2b0a83ce0ebb80e0d585189d",
     "status": 1
   }
 }
 ```
 
-**Uso en Kanbmine:** Validar credenciales después del login y obtener información del usuario.
+**Campos Importantes:**
+- `id`: Identificador único del usuario
+- `login`: Nombre de usuario
+- `api_key`: **Clave para todas las peticiones posteriores**
+- `status`: 1 = Activo, 2 = Registrado, 3 = Bloqueado
+
+**Respuestas de Error:**
+- `401 Unauthorized`: Credenciales incorrectas o API Key inválida
+- `403 Forbidden`: Usuario bloqueado
+
+**Uso en Kanbmine:** 
+- **Validar credenciales** en el formulario de login
+- **Obtener API Key** para usar en todas las peticiones subsecuentes
+- **Verificar sesión activa** al recargar la aplicación
 
 ---
 
@@ -1090,10 +1201,11 @@ GET /users/current.json?include=memberships,groups
 ## Resumen de Endpoints para Kanbmine
 
 ### Autenticación y Sesión
-| Método | Endpoint | Uso |
-|--------|----------|-----|
-| `GET` | `/users/current.json` | Validar credenciales y obtener usuario |
-| `GET` | `/users/{id}.json?include=memberships` | Obtener proyectos del usuario |
+| Método | Endpoint | Uso | Auth |
+|--------|----------|-----|------|
+| `GET` | `/users/current.json` | **Login:** Validar username/password y obtener API Key | HTTP Basic Auth |
+| `GET` | `/users/current.json` | Verificar sesión activa | API Key |
+| `GET` | `/users/{id}.json?include=memberships` | Obtener proyectos del usuario | API Key |
 
 ### Tablero Kanban
 | Método | Endpoint | Uso |
@@ -1123,8 +1235,84 @@ GET /users/current.json?include=memberships,groups
 ## Notas de Implementación
 
 ### HttpClient en .NET
+
+#### Login con Usuario y Password
 ```csharp
-// Configurar HttpClient con API Key
+public async Task<(bool success, string apiKey, RedmineUser user)> LoginAsync(
+    string username, string password)
+{
+    var client = new HttpClient
+    {
+        BaseAddress = new Uri("https://redmine.example.com")
+    };
+    
+    // Crear credenciales Base64
+    var credentials = Convert.ToBase64String(
+        Encoding.ASCII.GetBytes($"{username}:{password}"));
+    
+    // Agregar header de autenticación
+    client.DefaultRequestHeaders.Authorization = 
+        new AuthenticationHeaderValue("Basic", credentials);
+    
+    try
+    {
+        // Validar credenciales llamando a /users/current.json
+        var response = await client.GetAsync("/users/current.json");
+        
+        if (response.StatusCode == HttpStatusCode.Unauthorized)
+        {
+            return (false, null, null);
+        }
+        
+        response.EnsureSuccessStatusCode();
+        
+        var json = await response.Content.ReadAsStringAsync();
+        var result = JsonSerializer.Deserialize<UserResponse>(json);
+        
+        // Retornar API Key para futuras peticiones
+        return (true, result.User.ApiKey, result.User);
+    }
+    catch (HttpRequestException)
+    {
+        return (false, null, null);
+    }
+}
+
+// Modelo de respuesta
+public class UserResponse
+{
+    [JsonPropertyName("user")]
+    public RedmineUser User { get; set; }
+}
+
+public class RedmineUser
+{
+    [JsonPropertyName("id")]
+    public int Id { get; set; }
+    
+    [JsonPropertyName("login")]
+    public string Login { get; set; }
+    
+    [JsonPropertyName("firstname")]
+    public string Firstname { get; set; }
+    
+    [JsonPropertyName("lastname")]
+    public string Lastname { get; set; }
+    
+    [JsonPropertyName("mail")]
+    public string Mail { get; set; }
+    
+    [JsonPropertyName("api_key")]
+    public string ApiKey { get; set; }
+    
+    [JsonPropertyName("status")]
+    public int Status { get; set; }
+}
+```
+
+#### Peticiones Subsecuentes con API Key
+```csharp
+// Configurar HttpClient con API Key obtenida del login
 var client = new HttpClient
 {
     BaseAddress = new Uri("https://redmine.example.com")
@@ -1136,7 +1324,9 @@ var response = await client.GetAsync("/issues.json?project_id=1");
 var json = await response.Content.ReadAsStringAsync();
 
 // POST/PUT - Especificar Content-Type
-var content = new StringContent(json, Encoding.UTF8, "application/json");
+var issueData = new { issue = new { subject = "Nueva tarea" } };
+var jsonContent = JsonSerializer.Serialize(issueData);
+var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
 var response = await client.PostAsync("/issues.json", content);
 ```
 
@@ -1151,11 +1341,49 @@ if (!response.IsSuccessStatusCode)
 }
 ```
 
+### Persistencia de Sesión
+```csharp
+// Guardar API Key en LocalStorage (Blazor)
+await localStorage.SetItemAsync("redmine_api_key", apiKey);
+await localStorage.SetItemAsync("redmine_user", JsonSerializer.Serialize(user));
+
+// Recuperar sesión al recargar
+var apiKey = await localStorage.GetItemAsync<string>("redmine_api_key");
+if (!string.IsNullOrEmpty(apiKey))
+{
+    // Validar que la API Key siga siendo válida
+    var isValid = await ValidateApiKeyAsync(apiKey);
+    if (isValid)
+    {
+        // Restaurar sesión
+        var userJson = await localStorage.GetItemAsync<string>("redmine_user");
+        var user = JsonSerializer.Deserialize<RedmineUser>(userJson);
+    }
+    else
+    {
+        // API Key expirada o inválida, logout
+        await localStorage.RemoveItemAsync("redmine_api_key");
+        await localStorage.RemoveItemAsync("redmine_user");
+    }
+}
+
+// Validar API Key
+public async Task<bool> ValidateApiKeyAsync(string apiKey)
+{
+    var client = new HttpClient { BaseAddress = new Uri(redmineUrl) };
+    client.DefaultRequestHeaders.Add("X-Redmine-API-Key", apiKey);
+    
+    var response = await client.GetAsync("/users/current.json");
+    return response.IsSuccessStatusCode;
+}
+```
+
 ### Cache
 - Cachear issues con TTL de 2-5 minutos
 - Invalidar cache al actualizar un issue
 - Cachear issue_statuses (rara vez cambian)
 - Cachear proyectos del usuario
+- **NO cachear API Key** - usar almacenamiento seguro
 
 ### Optimización Drag & Drop
 1. Actualizar UI optimistamente
