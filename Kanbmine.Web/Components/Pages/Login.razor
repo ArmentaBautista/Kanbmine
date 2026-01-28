@@ -1,0 +1,118 @@
+@page "/login"
+@using System.ComponentModel.DataAnnotations
+@using Kanbmine.Core.Services
+@using Kanbmine.Web.Services
+@using Microsoft.AspNetCore.Components.Authorization
+@rendermode InteractiveServer
+@inject IAuthenticationService AuthService
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Navigation
+
+<PageTitle>Iniciar Sesión - Kanbmine</PageTitle>
+
+<div class="login-container">
+    <div class="login-card">
+        <div class="login-header">
+            <h2>Kanbmine</h2>
+            <p>Tablero Kanban integrado con Redmine</p>
+        </div>
+
+        <EditForm Model="@loginModel" OnValidSubmit="@HandleLogin" FormName="loginForm">
+            <DataAnnotationsValidator />
+            
+            <div class="form-group">
+                <label for="username">Usuario</label>
+                <InputText id="username" 
+                          @bind-Value="loginModel.Username" 
+                          class="form-control" 
+                          placeholder="Usuario de Redmine"
+                          disabled="@isLoading" />
+                <ValidationMessage For="@(() => loginModel.Username)" />
+            </div>
+
+            <div class="form-group">
+                <label for="password">Contraseña</label>
+                <InputText id="password" 
+                          type="password" 
+                          @bind-Value="loginModel.Password" 
+                          class="form-control" 
+                          placeholder="Contraseña"
+                          disabled="@isLoading" />
+                <ValidationMessage For="@(() => loginModel.Password)" />
+            </div>
+
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <div class="alert alert-danger">
+                    @errorMessage
+                </div>
+            }
+
+            <button type="submit" class="btn btn-primary btn-block" disabled="@isLoading">
+                @if (isLoading)
+                {
+                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                    <span>Iniciando sesión...</span>
+                }
+                else
+                {
+                    <span>Iniciar Sesión</span>
+                }
+            </button>
+        </EditForm>
+
+        <div class="login-footer">
+            <p>Usa tus credenciales de Redmine para acceder</p>
+        </div>
+    </div>
+</div>
+
+@code {
+    private LoginModel loginModel = new();
+    private bool isLoading = false;
+    private string errorMessage = string.Empty;
+
+    private async Task HandleLogin()
+    {
+        isLoading = true;
+        errorMessage = string.Empty;
+
+        try
+        {
+            var result = await AuthService.LoginAsync(loginModel.Username, loginModel.Password);
+
+            if (result.IsSuccess)
+            {
+                // Notificar al AuthStateProvider
+                if (AuthStateProvider is RedmineAuthStateProvider provider)
+                {
+                    provider.NotifyUserAuthentication(loginModel.Username);
+                }
+
+                // Redirigir al home
+                Navigation.NavigateTo("/", forceLoad: true);
+            }
+            else
+            {
+                errorMessage = result.ErrorMessage;
+            }
+        }
+        catch (Exception)
+        {
+            errorMessage = "Error inesperado durante la autenticación. Por favor, intenta nuevamente.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    public class LoginModel
+    {
+        [Required(ErrorMessage = "El usuario es requerido")]
+        public string Username { get; set; } = string.Empty;
+
+        [Required(ErrorMessage = "La contraseña es requerida")]
+        public string Password { get; set; } = string.Empty;
+    }
+}

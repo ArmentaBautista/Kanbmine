@@ -1,0 +1,106 @@
+@using Kanbmine.Shared.Models
+
+<div class="kanban-card" 
+     draggable="true" 
+     @ondragstart="@OnDragStart"
+     @onclick="@OnClick">
+    
+    <div class="card-header">
+        <span class="card-id">#{Issue.Id}</span>
+        @if (Issue.Priority != null)
+        {
+            <span class="card-priority priority-@Issue.Priority.Id">
+                @GetPriorityIcon(Issue.Priority.Id)
+            </span>
+        }
+    </div>
+
+    <div class="card-body">
+        <h4 class="card-title">@Issue.Subject</h4>
+        
+        @if (!string.IsNullOrEmpty(Issue.Description) && Issue.Description.Length > 0)
+        {
+            <p class="card-description">
+                @(Issue.Description.Length > 100 
+                    ? Issue.Description.Substring(0, 100) + "..." 
+                    : Issue.Description)
+            </p>
+        }
+    </div>
+
+    <div class="card-footer">
+        <div class="card-meta">
+            @if (Issue.AssignedTo != null)
+            {
+                <div class="card-assignee" title="Asignado a @Issue.AssignedTo.FullName">
+                    <span class="avatar">@GetInitials(Issue.AssignedTo.FullName)</span>
+                    <span class="assignee-name">@Issue.AssignedTo.FullName</span>
+                </div>
+            }
+            
+            @if (Issue.DueDate.HasValue)
+            {
+                <div class="card-due-date @GetDueDateClass(Issue.DueDate.Value)">
+                    📅 @Issue.DueDate.Value.ToString("dd/MM/yyyy")
+                </div>
+            }
+        </div>
+
+        @if (Issue.DoneRatio > 0)
+        {
+            <div class="card-progress">
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: @(Issue.DoneRatio)%"></div>
+                </div>
+                <span class="progress-text">@Issue.DoneRatio%</span>
+            </div>
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public RedmineIssue Issue { get; set; } = new();
+
+    [Parameter]
+    public EventCallback OnDragStart { get; set; }
+
+    [Parameter]
+    public EventCallback OnClick { get; set; }
+
+    private string GetInitials(string fullName)
+    {
+        if (string.IsNullOrEmpty(fullName)) return "?";
+        
+        var parts = fullName.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length >= 2)
+        {
+            return $"{parts[0][0]}{parts[1][0]}".ToUpper();
+        }
+        
+        return fullName[0].ToString().ToUpper();
+    }
+
+    private string GetPriorityIcon(int priorityId)
+    {
+        return priorityId switch
+        {
+            1 => "🔵", // Baja
+            2 => "⚪", // Normal
+            3 => "🟡", // Alta
+            4 => "🟠", // Urgente
+            5 => "🔴", // Inmediata
+            _ => "⚪"
+        };
+    }
+
+    private string GetDueDateClass(DateOnly dueDate)
+    {
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        var daysUntilDue = dueDate.DayNumber - today.DayNumber;
+
+        if (daysUntilDue < 0) return "overdue";
+        if (daysUntilDue <= 3) return "due-soon";
+        return "due-normal";
+    }
+}

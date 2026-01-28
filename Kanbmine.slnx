@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="Kanbmine.Core/Kanbmine.Core.csproj" />
+  <Project Path="Kanbmine.Infrastructure/Kanbmine.Infrastructure.csproj" />
+  <Project Path="Kanbmine.Shared/Kanbmine.Shared.csproj" />
+  <Project Path="Kanbmine.Web/Kanbmine.Web.csproj" />
+</Solution>

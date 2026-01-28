@@ -1,0 +1,176 @@
+.kanban-board {
+    padding: 20px;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background: #f5f6f8;
+}
+
+.kanban-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding: 20px;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.header-left h1 {
+    margin: 0;
+    font-size: 24px;
+    color: #2c3e50;
+}
+
+.project-badge {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 6px 16px;
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.header-right {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+
+.project-selector {
+    padding: 10px 16px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 14px;
+    min-width: 250px;
+    cursor: pointer;
+}
+
+.project-selector:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+.btn-refresh,
+.btn-logout {
+    padding: 10px 16px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.3s;
+    background: white;
+    border: 1px solid #ddd;
+}
+
+.btn-refresh:hover:not(:disabled),
+.btn-logout:hover {
+    background: #f8f9fa;
+    transform: translateY(-2px);
+}
+
+.btn-refresh:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.spinner-small {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid #ccc;
+    border-top-color: #667eea;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.kanban-columns {
+    display: flex;
+    gap: 16px;
+    overflow-x: auto;
+    flex: 1;
+    padding-bottom: 20px;
+}
+
+.loading-container,
+.error-container,
+.empty-state {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex: 1;
+    flex-direction: column;
+}
+
+.spinner {
+    width: 50px;
+    height: 50px;
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #667eea;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+.loading-container p {
+    margin-top: 16px;
+    color: #666;
+    font-size: 16px;
+}
+
+.error-message {
+    background: #fee;
+    border: 1px solid #fcc;
+    border-radius: 8px;
+    padding: 24px;
+    text-align: center;
+    max-width: 500px;
+}
+
+.error-message h3 {
+    color: #c33;
+    margin: 0 0 12px 0;
+}
+
+.error-message p {
+    color: #666;
+    margin: 0 0 16px 0;
+}
+
+.btn-retry {
+    padding: 10px 24px;
+    background: #667eea;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.btn-retry:hover {
+    background: #5568d3;
+}
+
+.empty-state {
+    text-align: center;
+}
+
+.empty-state h2 {
+    color: #2c3e50;
+    margin-bottom: 12px;
+}
+
+.empty-state p {
+    color: #666;
+    font-size: 16px;
+}

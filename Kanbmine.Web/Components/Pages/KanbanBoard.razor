@@ -1,0 +1,284 @@
+@using Kanbmine.Core.Services
+@using Kanbmine.Shared.Models
+@using Kanbmine.Web.Services
+@using Microsoft.AspNetCore.Components.Authorization
+@rendermode InteractiveServer
+@inject IIssueService IssueService
+@inject AuthenticationStateProvider AuthStateProvider
+@inject ILogger<KanbanBoard> Logger
+@inject NavigationManager Navigation
+
+<div class="kanban-board">
+    <div class="kanban-header">
+        <div class="header-left">
+            <h1>Tablero Kanban</h1>
+            @if (selectedProject != null)
+            {
+                <span class="project-badge">@selectedProject.Name</span>
+            }
+        </div>
+        
+        <div class="header-right">
+            <select class="project-selector" @onchange="OnProjectChanged" disabled="@isLoading">
+                <option value="">Seleccionar proyecto...</option>
+                @foreach (var project in projects)
+                {
+                    <option value="@project.Id" selected="@(project.Id == selectedProjectId)">
+                        @project.Name
+                    </option>
+                }
+            </select>
+            
+            <button class="btn-refresh" @onclick="RefreshBoard" disabled="@isLoading" title="Actualizar">
+                @if (isLoading)
+                {
+                    <span class="spinner-small"></span>
+                }
+                else
+                {
+                    <span>🔄</span>
+                }
+            </button>
+            
+            <button class="btn-logout" @onclick="Logout" title="Cerrar sesión">
+                <span>🚪</span> Salir
+            </button>
+        </div>
+    </div>
+
+    @if (isLoading && !statuses.Any())
+    {
+        <div class="loading-container">
+            <div class="spinner"></div>
+            <p>Cargando tablero...</p>
+        </div>
+    }
+    else if (errorMessage != null)
+    {
+        <div class="error-container">
+            <div class="error-message">
+                <h3>⚠️ Error</h3>
+                <p>@errorMessage</p>
+                <button class="btn-retry" @onclick="LoadInitialData">Reintentar</button>
+            </div>
+        </div>
+    }
+    else if (selectedProjectId == null)
+    {
+        <div class="empty-state">
+            <h2>👆 Selecciona un proyecto</h2>
+            <p>Elige un proyecto del selector superior para ver el tablero Kanban</p>
+        </div>
+    }
+    else
+    {
+        <div class="kanban-columns">
+            @foreach (var status in statuses)
+            {
+                var columnIssues = issuesByStatus.ContainsKey(status.Id) 
+                    ? issuesByStatus[status.Id] 
+                    : new List<RedmineIssue>();
+                
+                <KanbanColumn 
+                    Status="@status" 
+                    Issues="@columnIssues" 
+                    OnIssueDropped="@(args => HandleIssueDrop(args.issueId, args.newStatusId))"
+                    OnIssueClick="@HandleIssueClick" />
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private List<RedmineProject> projects = new();
+    private List<RedmineStatus> statuses = new();
+    private Dictionary<int, List<RedmineIssue>> issuesByStatus = new();
+    private int? selectedProjectId;
+    private RedmineProject? selectedProject;
+    private bool isLoading = false;
+    private string? errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Verificar autenticación
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        if (!authState.User.Identity?.IsAuthenticated ?? true)
+        {
+            Navigation.NavigateTo("/login", true);
+            return;
+        }
+
+        await LoadInitialData();
+    }
+
+    private async Task LoadInitialData()
+    {
+        isLoading = true;
+        errorMessage = null;
+
+        try
+        {
+            // Cargar proyectos
+            var projectsResult = await IssueService.GetProjectsAsync();
+            projects = projectsResult.Items;
+
+            // Cargar estados (solo abiertos)
+            statuses = await IssueService.GetAvailableStatusesAsync();
+
+            // Si hay proyectos, seleccionar el primero por defecto
+            if (projects.Any())
+            {
+                selectedProjectId = projects.First().Id;
+                selectedProject = projects.First();
+                await LoadIssues();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error cargando datos iniciales");
+            errorMessage = "No se pudo cargar la información del tablero. Verifica tu conexión con Redmine.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task LoadIssues()
+    {
+        if (selectedProjectId == null) return;
+
+        isLoading = true;
+        errorMessage = null;
+
+        try
+        {
+            var filter = new IssueFilter
+            {
+                ProjectId = selectedProjectId,
+                StatusId = "open",
+                Limit = 100,
+                Sort = "updated_on:desc"
+            };
+
+            var result = await IssueService.GetIssuesAsync(filter);
+
+            // Agrupar issues por estado
+            issuesByStatus = result.Items
+                .GroupBy(i => i.Status?.Id ?? 0)
+                .ToDictionary(g => g.Key, g => g.ToList());
+
+            Logger.LogInformation("Cargados {Count} issues para el proyecto {ProjectId}", 
+                result.Items.Count, selectedProjectId);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error cargando issues");
+            errorMessage = "No se pudieron cargar las tareas del proyecto.";
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task OnProjectChanged(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var projectId))
+        {
+            selectedProjectId = projectId;
+            selectedProject = projects.FirstOrDefault(p => p.Id == projectId);
+            await LoadIssues();
+        }
+        else
+        {
+            selectedProjectId = null;
+            selectedProject = null;
+            issuesByStatus.Clear();
+        }
+    }
+
+    private async Task RefreshBoard()
+    {
+        await LoadIssues();
+    }
+
+    private async Task HandleIssueDrop(int issueId, int newStatusId)
+    {
+        try
+        {
+            // Optimistic update: mover la tarjeta en la UI
+            var issue = issuesByStatus.Values
+                .SelectMany(list => list)
+                .FirstOrDefault(i => i.Id == issueId);
+
+            if (issue == null) return;
+
+            var oldStatusId = issue.Status?.Id ?? 0;
+            
+            if (oldStatusId == newStatusId) return;
+
+            // Mover en la UI
+            if (issuesByStatus.ContainsKey(oldStatusId))
+            {
+                issuesByStatus[oldStatusId].Remove(issue);
+            }
+
+            var newStatus = statuses.FirstOrDefault(s => s.Id == newStatusId);
+            if (newStatus != null)
+            {
+                issue.Status = newStatus;
+            }
+
+            if (!issuesByStatus.ContainsKey(newStatusId))
+            {
+                issuesByStatus[newStatusId] = new List<RedmineIssue>();
+            }
+            
+            issuesByStatus[newStatusId].Add(issue);
+            
+            StateHasChanged();
+
+            // Actualizar en Redmine
+            await IssueService.UpdateIssueStatusAsync(
+                issueId, 
+                newStatusId, 
+                $"Estado cambiado a {newStatus?.Name ?? "N/A"} desde el tablero Kanban");
+
+            Logger.LogInformation("Issue {IssueId} movido de estado {OldStatus} a {NewStatus}", 
+                issueId, oldStatusId, newStatusId);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error moviendo issue {IssueId}", issueId);
+            
+            // Rollback: recargar issues
+            await LoadIssues();
+            
+            errorMessage = "No se pudo mover la tarjeta. Por favor, intenta nuevamente.";
+            
+            // Limpiar error después de 5 segundos
+            _ = Task.Delay(5000).ContinueWith(_ => 
+            {
+                errorMessage = null;
+                InvokeAsync(StateHasChanged);
+            });
+        }
+    }
+
+    private void HandleIssueClick(int issueId)
+    {
+        // TODO: Abrir modal con detalle del issue
+        Logger.LogInformation("Click en issue {IssueId}", issueId);
+    }
+
+    private async Task Logout()
+    {
+        if (AuthStateProvider is RedmineAuthStateProvider provider)
+        {
+            provider.NotifyUserLogout();
+        }
+        
+        // Redirigir se manejará automáticamente por la autorización
+    }
+}

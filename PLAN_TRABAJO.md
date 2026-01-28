@@ -9,67 +9,68 @@
 ## Fase 1: Configuración Inicial del Proyecto
 
 ### 1.1 Estructura del Proyecto
-- [ ] Crear solución .NET 10 con estructura de carpetas:
+- [x] Crear solución .NET 10 con estructura de carpetas:
   - `Kanbmine.Web` (Blazor Server)
   - `Kanbmine.Core` (Lógica de negocio)
   - `Kanbmine.Infrastructure` (Acceso a datos/API)
   - `Kanbmine.Shared` (DTOs y modelos compartidos)
-- [ ] Configurar `.gitignore` para .NET
-- [ ] Crear `README.md` con documentación básica
-- [ ] Configurar archivo de configuración `appsettings.json` con endpoints de Redmine
+- [x] Configurar `.gitignore` para .NET
+- [x] Crear `README.md` con documentación básica
+- [x] Configurar archivo de configuración `appsettings.json` con endpoints de Redmine
 
 ### 1.2 Dependencias
-- [ ] Instalar paquetes NuGet necesarios:
-  - `Microsoft.AspNetCore.Components.Server`
-  - `System.Net.Http.Json`
-  - `Microsoft.Extensions.Configuration`
-  - `Microsoft.Extensions.Http`
-  - `Blazored.LocalStorage` (para persistencia cliente)
+- [x] Instalar paquetes NuGet necesarios:
+  - `Microsoft.AspNetCore.Components.Server` ✓
+  - `System.Net.Http.Json` ✓
+  - `Microsoft.Extensions.Configuration` ✓
+  - `Microsoft.Extensions.Http.Polly` ✓
+  - `Blazored.LocalStorage` ✓
 
 ---
 
 ## Fase 2: Integración con API de Redmine
 
 ### 2.1 Cliente HTTP para Redmine
-- [ ] Crear interfaz `IRedmineApiClient` con métodos:
+- [x] Analiza la documentación de la API de Redmine #Redmine_API_ENDPOINTS.md
+- [x] Crear interfaz `IRedmineApiClient` con métodos:
   - `AuthenticateAsync(username, password)` → Validar credenciales
   - `GetUserAsync(apiKey)` → Obtener datos del usuario
   - `GetIssuesAsync(projectId, filters)` → Obtener tareas
   - `UpdateIssueStatusAsync(issueId, statusId)` → Actualizar estatus
   - `AddCommentAsync(issueId, comment)` → Agregar comentario
-- [ ] Implementar `RedmineApiClient` con manejo de:
+- [x] Implementar `RedmineApiClient` con manejo de:
   - Autenticación por API Key
   - Paginación de resultados
   - Manejo de errores HTTP
   - Deserialización de respuestas JSON
-- [ ] Crear modelos DTO para respuestas de Redmine:
+- [x] Crear modelos DTO para respuestas de Redmine:
   - `RedmineUser`
   - `RedmineIssue`
   - `RedmineStatus`
   - `RedmineProject`
 
 ### 2.2 Servicios de Negocio
-- [ ] Crear `IAuthenticationService` para:
+- [x] Crear `IAuthenticationService` para:
   - Login con credenciales Redmine
   - Almacenar API Key de forma segura
   - Validar sesión activa
-- [ ] Crear `IIssueService` para:
+- [x] Crear `IIssueService` para:
   - Mapear issues de Redmine a modelo de tarjetas Kanban
   - Filtrar y agrupar tareas por estado
   - Cachear datos para optimizar llamadas
-- [ ] Configurar inyección de dependencias en `Program.cs`
+- [x] Configurar inyección de dependencias en `Program.cs`
 
 ---
 
 ## Fase 3: Autenticación y Sesión
 
 ### 3.1 Sistema de Login
-- [ ] Crear componente `Login.razor`:
+- [x] Crear componente `Login.razor`:
   - Formulario con usuario/contraseña
   - Validación de campos
   - Indicador de carga
   - Manejo de errores de autenticación
-- [ ] Implementar `AuthStateProvider` personalizado:
+- [x] Implementar `AuthStateProvider` personalizado:
   - Mantener estado de autenticación
   - Persistir API Key en LocalStorage
   - Recuperar sesión al recargar página

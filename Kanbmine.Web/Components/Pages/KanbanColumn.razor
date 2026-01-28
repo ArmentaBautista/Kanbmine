@@ -1,0 +1,61 @@
+@using Kanbmine.Shared.Models
+
+<div class="kanban-column" 
+     @ondrop="@(() => OnDrop())" 
+     @ondragover:preventDefault="true"
+     @ondragenter:preventDefault="true">
+    
+    <div class="column-header">
+        <h3>@Status.Name</h3>
+        <span class="issue-count">@Issues.Count</span>
+    </div>
+
+    <div class="column-content">
+        @if (!Issues.Any())
+        {
+            <div class="column-empty">
+                <p>Sin tareas</p>
+            </div>
+        }
+        else
+        {
+            @foreach (var issue in Issues)
+            {
+                <KanbanCard 
+                    Issue="@issue" 
+                    OnDragStart="@(() => OnDragStart(issue.Id))"
+                    OnClick="@(() => OnIssueClick.InvokeAsync(issue.Id))" />
+            }
+        }
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public RedmineStatus Status { get; set; } = new();
+
+    [Parameter]
+    public List<RedmineIssue> Issues { get; set; } = new();
+
+    [Parameter]
+    public EventCallback<(int issueId, int newStatusId)> OnIssueDropped { get; set; }
+
+    [Parameter]
+    public EventCallback<int> OnIssueClick { get; set; }
+
+    private int? draggedIssueId;
+
+    private void OnDragStart(int issueId)
+    {
+        draggedIssueId = issueId;
+    }
+
+    private async Task OnDrop()
+    {
+        if (draggedIssueId.HasValue)
+        {
+            await OnIssueDropped.InvokeAsync((draggedIssueId.Value, Status.Id));
+            draggedIssueId = null;
+        }
+    }
+}
